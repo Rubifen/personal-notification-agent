@@ -2,3 +2,7 @@ customtkinter
 plyer
 python-dotenv
 requests
+SpeechRecognition
+sounddevice
+soundfile
+numpy

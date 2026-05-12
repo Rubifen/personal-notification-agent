@@ -1,5 +1,7 @@
 import customtkinter as ctk
+import threading
 from core.gestor_tareas import GestorTareas
+from core.voz import escuchar_y_transcribir
 
 class NotificationAgentGUI(ctk.CTk):
     def __init__(self):
@@ -143,7 +145,7 @@ class NotificationAgentGUI(ctk.CTk):
         buttons_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         buttons_frame.grid(row=0, column=2, padx=(15, 0), sticky="e")
         
-        btn_mic = ctk.CTkButton(
+        self.btn_mic = ctk.CTkButton(
             buttons_frame, 
             text="🎤", 
             width=40, 
@@ -151,9 +153,10 @@ class NotificationAgentGUI(ctk.CTk):
             corner_radius=8,
             fg_color="#444444",
             hover_color="#555555",
-            font=ctk.CTkFont(size=18)
+            font=ctk.CTkFont(size=18),
+            command=self.iniciar_grabacion
         )
-        btn_mic.pack(side="left", padx=(0, 10))
+        self.btn_mic.pack(side="left", padx=(0, 10))
 
         btn_send = ctk.CTkButton(
             buttons_frame, 
@@ -167,6 +170,38 @@ class NotificationAgentGUI(ctk.CTk):
             command=self.enviar_orden
         )
         btn_send.pack(side="left")
+
+    def iniciar_grabacion(self):
+        # Cambiar apariencia a grabando
+        self.btn_mic.configure(fg_color="red", hover_color="darkred", state="disabled")
+        self.entry_orden.delete(0, 'end')
+        self.entry_orden.configure(placeholder_text="Escuchando (5s)...")
+        
+        # Iniciar hilo para no congelar la GUI
+        threading.Thread(target=self._hilo_escucha, daemon=True).start()
+
+    def _hilo_escucha(self):
+        escuchar_y_transcribir(self._on_listen_success, self._on_listen_error)
+
+    def _on_listen_success(self, texto):
+        # Usamos .after para volver al hilo principal de forma segura
+        self.after(0, self._actualizar_ui_voz, texto, False)
+
+    def _on_listen_error(self, error):
+        self.after(0, self._actualizar_ui_voz, error, True)
+
+    def _actualizar_ui_voz(self, texto, es_error):
+        # Restaurar botón
+        self.btn_mic.configure(fg_color="#444444", hover_color="#555555", state="normal")
+        self.entry_orden.configure(placeholder_text="Escribe tu orden aquí...")
+        
+        if not es_error:
+            self.entry_orden.delete(0, 'end')
+            self.entry_orden.insert(0, texto)
+        else:
+            # Mostrar error temporalmente en el entry
+            self.entry_orden.delete(0, 'end')
+            self.entry_orden.configure(placeholder_text=f"Error: {texto}")
 
     def enviar_orden(self):
         orden = self.entry_orden.get().strip()
