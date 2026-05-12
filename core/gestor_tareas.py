@@ -68,3 +68,10 @@ class GestorTareas:
         cursor.execute("UPDATE tareas SET recurrencia = ? WHERE id = ?", (1 if recurrencia else 0, tarea_id))
         conexion.commit()
         conexion.close()
+
+    def eliminar_tarea(self, tarea_id):
+        conexion = sqlite3.connect(self.db_path)
+        cursor = conexion.cursor()
+        cursor.execute("DELETE FROM tareas WHERE id = ?", (tarea_id,))
+        conexion.commit()
+        conexion.close()

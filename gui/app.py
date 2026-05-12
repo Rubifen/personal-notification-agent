@@ -1,5 +1,6 @@
 import customtkinter as ctk
 import threading
+from tkinter import messagebox
 from core.gestor_tareas import GestorTareas
 from core.voz import escuchar_y_transcribir
 
@@ -94,6 +95,19 @@ class NotificationAgentGUI(ctk.CTk):
             )
             title.pack(side="left")
             
+            # Botón de eliminar alineado a la derecha (aparecerá a la derecha del checkbox)
+            btn_eliminar = ctk.CTkButton(
+                header,
+                text="🗑️",
+                width=30,
+                height=24,
+                corner_radius=4,
+                fg_color="#8d1f1f",
+                hover_color="#5e1414",
+                command=lambda t_id=tarea['id']: self._eliminar_tarea(t_id)
+            )
+            btn_eliminar.pack(side="right", padx=(10, 0))
+
             # Checkbox de recurrencia alineado a la derecha
             var_recurrencia = ctk.BooleanVar(value=tarea['recurrencia'])
             chk_recurrencia = ctk.CTkCheckBox(
@@ -115,6 +129,12 @@ class NotificationAgentGUI(ctk.CTk):
 
     def _toggle_recurrencia(self, tarea_id, var):
         self.gestor.actualizar_recurrencia(tarea_id, var.get())
+
+    def _eliminar_tarea(self, tarea_id):
+        confirmar = messagebox.askyesno("Eliminar Tarea", f"¿Estás seguro de que quieres eliminar la tarea #{tarea_id}?")
+        if confirmar:
+            self.gestor.eliminar_tarea(tarea_id)
+            self.cargar_tareas()
 
     def _create_controls(self):
         controls_frame = ctk.CTkFrame(self, fg_color="transparent")
