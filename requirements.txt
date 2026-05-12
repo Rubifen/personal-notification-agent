@@ -6,3 +6,6 @@ SpeechRecognition
 sounddevice
 soundfile
 numpy
+openai
+beautifulsoup4
+schedule
