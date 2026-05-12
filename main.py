@@ -1,5 +1,7 @@
+from gui.app import run_app
+
 def main():
-    pass
+    run_app()
 
 if __name__ == "__main__":
     main()
