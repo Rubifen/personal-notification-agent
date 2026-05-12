@@ -8,22 +8,16 @@ class AgenteLLM:
         load_dotenv()
         self.api_key = os.getenv("OPENROUTER_API_KEY")
         
-        # Configuramos el cliente OpenAI para usar OpenRouter
         if self.api_key:
             self.client = OpenAI(
                 base_url="https://openrouter.ai/api/v1",
                 api_key=self.api_key,
             )
-            # Modelo rápido y avanzado en OpenRouter
             self.modelo = "google/gemini-2.5-pro"
         else:
             self.client = None
 
     def extraer_intencion(self, orden):
-        """
-        Llama al LLM para extraer la herramienta, parámetros y condición de la orden.
-        Devuelve un diccionario estructurado.
-        """
         if not self.client:
             print("No hay API Key de OpenRouter configurada.")
             return None
@@ -34,15 +28,21 @@ class AgenteLLM:
         {
             "herramienta": "clima|scraper|ninguna",
             "parametros": {"ciudad": "Nombre", "url": "URL", "selector": "CSS"},
-            "condicion": "Texto libre resumiendo qué debe cumplirse para notificar (ej. 'llueve', 'temperatura > 20', 'precio < 10')"
+            "condicion": "Texto libre resumiendo qué debe cumplirse para notificar (ej. 'llueve', 'temperatura > 20')",
+            "frecuencia_minutos": 1
         }
+        
+        Reglas para frecuencia_minutos:
+        - Si es un aviso de tiempo relativo corto (ej. "en 15 minutos", "a las 5"), usa 1.
+        - Si es clima, usa 30 o 60 (no tiene sentido comprobar cada minuto).
+        - Si es precio de tienda web o scraper general, usa 60 o 120 para no saturarla.
         
         Ejemplos:
         Orden: "Avisame si llueve en Madrid"
-        {"herramienta": "clima", "parametros": {"ciudad": "Madrid"}, "condicion": "llueve"}
+        {"herramienta": "clima", "parametros": {"ciudad": "Madrid"}, "condicion": "llueve", "frecuencia_minutos": 60}
         
-        Orden: "Mira el precio en https://ejemplo.com/producto en el h1.price y avisa si baja de 10"
-        {"herramienta": "scraper", "parametros": {"url": "https://ejemplo.com/producto", "selector": "h1.price"}, "condicion": "baja de 10"}
+        Orden: "Avisame en 15 minutos"
+        {"herramienta": "ninguna", "parametros": {}, "condicion": "han pasado 15 minutos", "frecuencia_minutos": 1}
         """
 
         try:
