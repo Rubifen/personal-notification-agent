@@ -50,3 +50,4 @@ El desarrollo de este proyecto se ha llevado de forma ágil con implementaciones
 - `patch: refresco automatico de la gui cuando finalizan tareas` (Callbacks entre el hilo de fondo y CustomTkinter).
 - `feat: implementar comprobaciones dinamicas con frecuencia variable y tiempo relativo` (Actualización de Base de Datos para soportar frecuencias por tarea y evaluación de tiempos relativos correctos).
 - `fix: aplicar realmente la actualizacion del esquema de la base de datos` (Resolución de conflictos de parámetros en SQL).
+- `feat: panel de ajustes visual e integracion con whatsapp via callmebot` (Nueva ventana GUI para credenciales y canal de WhatsApp).
