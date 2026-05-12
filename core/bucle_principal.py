@@ -9,12 +9,13 @@ from tools.clima_api import obtener_clima
 from tools.web_scraper import obtener_dato_web
 
 class BucleEjecucion:
-    def __init__(self):
+    def __init__(self, callback_actualizacion=None):
         self.gestor = GestorTareas()
         self.agente = AgenteLLM()
         self.notificador = Notificador()
         self.hilo = None
         self.corriendo = False
+        self.callback_actualizacion = callback_actualizacion
 
     def _evaluar_condicion(self, json_intencion, resultado_herramienta):
         """
@@ -50,6 +51,7 @@ class BucleEjecucion:
     def procesar_tareas(self):
         print("Bucle Principal: Revisando tareas activas...")
         activas = self.gestor.obtener_tareas('activa')
+        hubo_cambios = False
         
         for tarea in activas:
             orden = tarea['orden']
@@ -104,6 +106,10 @@ class BucleEjecucion:
                 if not tarea['recurrencia']:
                     self.gestor.actualizar_estado(tarea['id'], 'finalizada')
                     print(f"Tarea #{tarea['id']} marcada como finalizada.")
+                    hubo_cambios = True
+
+        if hubo_cambios and self.callback_actualizacion:
+            self.callback_actualizacion()
 
     def iniciar(self):
         self.corriendo = True
