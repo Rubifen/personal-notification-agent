@@ -5,7 +5,10 @@ from dotenv import load_dotenv
 
 class AgenteLLM:
     def __init__(self):
-        load_dotenv()
+        self.recargar_credenciales()
+
+    def recargar_credenciales(self):
+        load_dotenv(override=True)
         self.api_key = os.getenv("OPENROUTER_API_KEY")
         
         if self.api_key:

@@ -7,11 +7,16 @@ from dotenv import load_dotenv
 
 class Notificador:
     def __init__(self):
-        load_dotenv()
+        self.recargar_credenciales()
+
+    def recargar_credenciales(self):
+        load_dotenv(override=True)
         self.email_user = os.getenv("EMAIL_USER")
         self.email_pass = os.getenv("EMAIL_PASS")
         self.telegram_token = os.getenv("TELEGRAM_TOKEN")
         self.telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        self.whatsapp_phone = os.getenv("WHATSAPP_PHONE")
+        self.whatsapp_api_key = os.getenv("WHATSAPP_API_KEY")
 
     def notificar_escritorio(self, mensaje):
         try:
@@ -59,3 +64,17 @@ class Notificador:
             response.raise_for_status()
         except Exception as e:
             print(f"Error al enviar por Telegram: {e}")
+
+    def notificar_whatsapp(self, mensaje):
+        if not self.whatsapp_phone or not self.whatsapp_api_key:
+            print("Credenciales de WhatsApp no configuradas.")
+            return
+
+        try:
+            import urllib.parse
+            texto_codificado = urllib.parse.quote(mensaje)
+            url = f"https://api.callmebot.com/whatsapp.php?phone={self.whatsapp_phone}&text={texto_codificado}&apikey={self.whatsapp_api_key}"
+            response = requests.get(url)
+            response.raise_for_status()
+        except Exception as e:
+            print(f"Error al enviar por WhatsApp: {e}")

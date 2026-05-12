@@ -5,6 +5,8 @@ from tkinter import messagebox
 from core.gestor_tareas import GestorTareas
 from core.voz import escuchar_y_transcribir
 from core.agente_llm import AgenteLLM
+from gui.ajustes import VentanaAjustes
+from core.agente_llm import AgenteLLM
 
 class NotificationAgentGUI(ctk.CTk):
     def __init__(self):
@@ -41,6 +43,7 @@ class NotificationAgentGUI(ctk.CTk):
         header_frame.grid(row=0, column=0, sticky="nsew")
         header_frame.grid_rowconfigure(0, weight=1)
         header_frame.grid_columnconfigure(0, weight=1)
+        header_frame.grid_columnconfigure(1, weight=0)
         
         title_label = ctk.CTkLabel(
             header_frame, 
@@ -48,6 +51,18 @@ class NotificationAgentGUI(ctk.CTk):
             font=ctk.CTkFont(size=28, weight="bold")
         )
         title_label.grid(row=0, column=0)
+
+        btn_ajustes = ctk.CTkButton(
+            header_frame,
+            text="⚙️",
+            width=40,
+            height=40,
+            fg_color="transparent",
+            hover_color="#333333",
+            font=ctk.CTkFont(size=24),
+            command=self.abrir_ajustes
+        )
+        btn_ajustes.grid(row=0, column=1, padx=20)
 
     def _create_task_viewer(self):
         viewer_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -151,7 +166,7 @@ class NotificationAgentGUI(ctk.CTk):
 
         self.combo_canal = ctk.CTkComboBox(
             controls_frame, 
-            values=["Telegram", "Email", "Escritorio"],
+            values=["Telegram", "WhatsApp", "Email", "Escritorio"],
             width=110,
             height=40
         )
@@ -269,6 +284,12 @@ class NotificationAgentGUI(ctk.CTk):
         self.entry_freq.delete(0, 'end')
         self.cargar_tareas()
         self.tabview.set("Activas")
+
+    def abrir_ajustes(self):
+        VentanaAjustes(self, on_save_callback=self.recargar_credenciales_app)
+
+    def recargar_credenciales_app(self):
+        self.agente.recargar_credenciales()
 
 def run_app():
     app = NotificationAgentGUI()

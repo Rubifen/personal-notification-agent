@@ -51,6 +51,10 @@ class BucleEjecucion:
             return False
 
     def procesar_tareas(self):
+        # Refrescar credenciales en caliente por si se cambiaron en los ajustes
+        self.agente.recargar_credenciales()
+        self.notificador.recargar_credenciales()
+
         print("Bucle Principal: Revisando tareas activas...")
         activas = self.gestor.obtener_tareas('activa')
         hubo_cambios = False
@@ -122,6 +126,8 @@ class BucleEjecucion:
                     self.notificador.notificar_email(mensaje)
                 elif 'telegram' in canal:
                     self.notificador.notificar_telegram(mensaje)
+                elif 'whatsapp' in canal:
+                    self.notificador.notificar_whatsapp(mensaje)
 
                 # Cambiar estado si no es recurrente
                 if not tarea['recurrencia']:
