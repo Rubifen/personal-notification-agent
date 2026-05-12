@@ -1,1 +1,4 @@
 customtkinter
+plyer
+python-dotenv
+requests

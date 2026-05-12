@@ -1,35 +1,38 @@
 import customtkinter as ctk
+from core.gestor_tareas import GestorTareas
 
 class NotificationAgentGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
+        
+        # Inicializar base de datos
+        self.gestor = GestorTareas()
 
         # Configuración básica de la ventana
         self.title("Panel de Control Agéntico")
         self.geometry("800x600")
-        self.resizable(False, False) # Tamaño fijo
+        self.resizable(False, False)
         
         # Dark Mode por defecto
         ctk.set_appearance_mode("dark") 
         ctk.set_default_color_theme("blue")
 
-        # Configurar grid de la ventana principal
-        # Usamos pesos proporcionales para lograr 10% / 70% / 20%
-        self.grid_rowconfigure(0, weight=1)  # Header (10%)
-        self.grid_rowconfigure(1, weight=7)  # Visor de Tareas (70%)
-        self.grid_rowconfigure(2, weight=2)  # Controles (20%)
+        # Configurar grid
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=7)
+        self.grid_rowconfigure(2, weight=2)
         self.grid_columnconfigure(0, weight=1)
 
         self._create_header()
         self._create_task_viewer()
         self._create_controls()
 
+        # Cargar tareas reales al iniciar
+        self.cargar_tareas()
+
     def _create_header(self):
-        # Header (10% superior) con fondo gris muy oscuro
         header_frame = ctk.CTkFrame(self, fg_color="#111111", corner_radius=0)
         header_frame.grid(row=0, column=0, sticky="nsew")
-        
-        # Centrar el texto en el header
         header_frame.grid_rowconfigure(0, weight=1)
         header_frame.grid_columnconfigure(0, weight=1)
         
@@ -41,84 +44,105 @@ class NotificationAgentGUI(ctk.CTk):
         title_label.grid(row=0, column=0)
 
     def _create_task_viewer(self):
-        # Visor de Tareas (70% central)
         viewer_frame = ctk.CTkFrame(self, fg_color="transparent")
         viewer_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
         
         viewer_frame.grid_rowconfigure(0, weight=1)
         viewer_frame.grid_columnconfigure(0, weight=1)
 
-        # Componente CTkTabview
-        tabview = ctk.CTkTabview(viewer_frame)
-        tabview.grid(row=0, column=0, sticky="nsew")
+        self.tabview = ctk.CTkTabview(viewer_frame)
+        self.tabview.grid(row=0, column=0, sticky="nsew")
         
-        tab_activas = tabview.add("Activas")
-        tab_finalizadas = tabview.add("Finalizadas")
+        tab_activas = self.tabview.add("Activas")
+        tab_finalizadas = self.tabview.add("Finalizadas")
 
-        # CTkScrollableFrame para Activas
-        scroll_activas = ctk.CTkScrollableFrame(tab_activas, fg_color="transparent")
-        scroll_activas.pack(expand=True, fill="both")
-        self._add_fake_cards(scroll_activas)
+        self.scroll_activas = ctk.CTkScrollableFrame(tab_activas, fg_color="transparent")
+        self.scroll_activas.pack(expand=True, fill="both")
 
-        # CTkScrollableFrame para Finalizadas
-        scroll_finalizadas = ctk.CTkScrollableFrame(tab_finalizadas, fg_color="transparent")
-        scroll_finalizadas.pack(expand=True, fill="both")
-        self._add_fake_cards(scroll_finalizadas)
+        self.scroll_finalizadas = ctk.CTkScrollableFrame(tab_finalizadas, fg_color="transparent")
+        self.scroll_finalizadas.pack(expand=True, fill="both")
 
-    def _add_fake_cards(self, parent_frame):
-        # Añadir 3 tarjetas falsas con esquinas muy redondeadas y margen
-        for i in range(1, 4):
+    def cargar_tareas(self):
+        # Limpiar frames actuales
+        for widget in self.scroll_activas.winfo_children():
+            widget.destroy()
+        for widget in self.scroll_finalizadas.winfo_children():
+            widget.destroy()
+
+        # Obtener tareas desde BD
+        activas = self.gestor.obtener_tareas('activa')
+        finalizadas = self.gestor.obtener_tareas('finalizada')
+
+        self._renderizar_lista(activas, self.scroll_activas)
+        self._renderizar_lista(finalizadas, self.scroll_finalizadas)
+
+    def _renderizar_lista(self, tareas, parent_frame):
+        for tarea in tareas:
             card = ctk.CTkFrame(parent_frame, corner_radius=20, fg_color="#2b2b2b")
-            card.pack(fill="x", padx=10, pady=15) # Bastante margen entre tarjetas
+            card.pack(fill="x", padx=10, pady=15)
+            
+            # Header de la tarjeta
+            header = ctk.CTkFrame(card, fg_color="transparent")
+            header.pack(fill="x", padx=20, pady=(20, 5))
             
             title = ctk.CTkLabel(
-                card, 
-                text=f"Tarea de Ejemplo #{i}", 
+                header, 
+                text=f"Orden #{tarea['id']} - [{tarea['canal']}]", 
                 font=ctk.CTkFont(size=16, weight="bold")
             )
-            title.pack(anchor="w", padx=20, pady=(20, 5))
+            title.pack(side="left")
+            
+            # Checkbox de recurrencia alineado a la derecha
+            var_recurrencia = ctk.BooleanVar(value=tarea['recurrencia'])
+            chk_recurrencia = ctk.CTkCheckBox(
+                header, 
+                text="Recurrente",
+                variable=var_recurrencia,
+                command=lambda t_id=tarea['id'], var=var_recurrencia: self._toggle_recurrencia(t_id, var)
+            )
+            chk_recurrencia.pack(side="right")
             
             desc = ctk.CTkLabel(
                 card, 
-                text="Descripción breve de la tarea simulada para ver el diseño estático.", 
-                text_color="#aaaaaa"
+                text=tarea['orden'], 
+                text_color="#aaaaaa",
+                wraplength=600,
+                justify="left"
             )
             desc.pack(anchor="w", padx=20, pady=(0, 20))
 
+    def _toggle_recurrencia(self, tarea_id, var):
+        self.gestor.actualizar_recurrencia(tarea_id, var.get())
+
     def _create_controls(self):
-        # Controles (20% inferior)
         controls_frame = ctk.CTkFrame(self, fg_color="transparent")
         controls_frame.grid(row=2, column=0, sticky="nsew", padx=20, pady=(0, 20))
         
-        # Grid para distribuir izquierda, centro y derecha
-        controls_frame.grid_columnconfigure(0, weight=0) # Izquierda
-        controls_frame.grid_columnconfigure(1, weight=1) # Centro (Entry ancho)
-        controls_frame.grid_columnconfigure(2, weight=0) # Derecha
+        controls_frame.grid_columnconfigure(0, weight=0)
+        controls_frame.grid_columnconfigure(1, weight=1)
+        controls_frame.grid_columnconfigure(2, weight=0)
         controls_frame.grid_rowconfigure(0, weight=1)
 
-        # Izquierda: CTkComboBox
-        combo = ctk.CTkComboBox(
+        self.combo_canal = ctk.CTkComboBox(
             controls_frame, 
             values=["Telegram", "Email", "Escritorio"],
             width=140,
             height=40
         )
-        combo.grid(row=0, column=0, padx=(0, 15), sticky="w")
-        combo.set("Telegram") # Valor por defecto
+        self.combo_canal.grid(row=0, column=0, padx=(0, 15), sticky="w")
+        self.combo_canal.set("Telegram")
 
-        # Centro: CTkEntry ancho
-        entry = ctk.CTkEntry(
+        self.entry_orden = ctk.CTkEntry(
             controls_frame, 
             placeholder_text="Escribe tu orden aquí...",
             height=40
         )
-        entry.grid(row=0, column=1, padx=5, sticky="ew")
+        self.entry_orden.grid(row=0, column=1, padx=5, sticky="ew")
+        self.entry_orden.bind("<Return>", lambda event: self.enviar_orden()) # Permitir pulsar Enter
 
-        # Derecha: Botón Cuadrado (Micrófono) y Botón Azul (Enviar)
         buttons_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         buttons_frame.grid(row=0, column=2, padx=(15, 0), sticky="e")
         
-        # Botón Micrófono
         btn_mic = ctk.CTkButton(
             buttons_frame, 
             text="🎤", 
@@ -131,7 +155,6 @@ class NotificationAgentGUI(ctk.CTk):
         )
         btn_mic.pack(side="left", padx=(0, 10))
 
-        # Botón Enviar (Azul)
         btn_send = ctk.CTkButton(
             buttons_frame, 
             text="Enviar", 
@@ -140,9 +163,27 @@ class NotificationAgentGUI(ctk.CTk):
             corner_radius=8,
             fg_color="#1f538d",
             hover_color="#14375e",
-            font=ctk.CTkFont(weight="bold")
+            font=ctk.CTkFont(weight="bold"),
+            command=self.enviar_orden
         )
         btn_send.pack(side="left")
+
+    def enviar_orden(self):
+        orden = self.entry_orden.get().strip()
+        canal = self.combo_canal.get()
+        
+        if orden:
+            # Guardamos la orden
+            self.gestor.agregar_tarea(orden, canal, recurrencia=False)
+            
+            # Limpiamos el input
+            self.entry_orden.delete(0, 'end')
+            
+            # Recargamos la interfaz
+            self.cargar_tareas()
+            
+            # Cambiamos a la pestaña de Activas
+            self.tabview.set("Activas")
 
 def run_app():
     app = NotificationAgentGUI()
