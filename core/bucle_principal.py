@@ -2,6 +2,7 @@ import time
 import threading
 import schedule
 import datetime
+import json
 from core.gestor_tareas import GestorTareas
 from core.agente_llm import AgenteLLM
 from core.notificador import Notificador
@@ -17,7 +18,7 @@ class BucleEjecucion:
         self.corriendo = False
         self.callback_actualizacion = callback_actualizacion
 
-    def _evaluar_condicion(self, json_intencion, resultado_herramienta):
+    def _evaluar_condicion(self, json_intencion, resultado_herramienta, fecha_creacion):
         """
         Usa el LLM para evaluar si se cumple la condición dada la salida de la herramienta.
         Devuelve True o False.
@@ -29,8 +30,9 @@ class BucleEjecucion:
         prompt = f"""
         El usuario estableció la siguiente condición para notificarle: "{condicion}"
         La herramienta ha devuelto el siguiente resultado actual: "{resultado_herramienta}"
+        Contexto importante: Esta tarea fue pedida originalmente por el usuario en la siguiente fecha y hora: {fecha_creacion}
         
-        ¿Se cumple la condición basándonos estrictamente en el resultado actual? 
+        ¿Se cumple la condición basándonos estrictamente en el resultado actual y el contexto de cuándo se pidió? 
         Responde solo con la palabra "SI" o "NO".
         """
         
@@ -52,17 +54,35 @@ class BucleEjecucion:
         print("Bucle Principal: Revisando tareas activas...")
         activas = self.gestor.obtener_tareas('activa')
         hubo_cambios = False
+        ahora = datetime.datetime.now()
         
         for tarea in activas:
-            orden = tarea['orden']
-            print(f"Procesando Tarea #{tarea['id']}: {orden}")
+            ultima_ejecucion_str = tarea.get('ultima_ejecucion')
+            frecuencia = tarea.get('frecuencia_minutos', 1)
             
-            # 1. Extraer intención
-            intencion = self.agente.extraer_intencion(orden)
-            if not intencion:
+            # Filtro de frecuencia
+            if ultima_ejecucion_str:
+                ultima_ejecucion = datetime.datetime.fromisoformat(ultima_ejecucion_str)
+                minutos_pasados = (ahora - ultima_ejecucion).total_seconds() / 60
+                if minutos_pasados < frecuencia:
+                    # Aún no toca revisar esta tarea
+                    continue
+
+            orden = tarea['orden']
+            print(f"Procesando Tarea #{tarea['id']}: {orden} (Frecuencia: {frecuencia} min)")
+            
+            # 1. Leer intención extraída previamente
+            intencion_str = tarea.get('intencion_json')
+            if not intencion_str:
+                print("No se encontró intención JSON en la base de datos.")
                 continue
                 
-            print(f"Intención extraída: {intencion}")
+            try:
+                intencion = json.loads(intencion_str)
+            except:
+                print("Error parseando intención JSON")
+                continue
+                
             herramienta = intencion.get('herramienta', 'ninguna').lower()
             parametros = intencion.get('parametros', {})
             
@@ -78,20 +98,21 @@ class BucleEjecucion:
                 if url and selector:
                     resultado = obtener_dato_web(url, selector)
             else:
-                ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-                resultado = f"Información de sistema: La fecha y hora actual del equipo es {ahora}."
+                ahora_str = ahora.strftime("%Y-%m-%d %H:%M:%S")
+                resultado = f"Información de sistema: La fecha y hora actual del equipo es {ahora_str}."
 
             if resultado is None:
                 continue
             
-            print(f"Resultado herramienta: {resultado}")
-
-            # 3. Evaluar Condición
-            se_cumple = self._evaluar_condicion(intencion, resultado)
+            # 3. Evaluar Condición con contexto temporal relativo
+            se_cumple = self._evaluar_condicion(intencion, resultado, tarea['fecha_creacion'])
+            
+            # 4. Actualizar última ejecución
+            self.gestor.actualizar_ultima_ejecucion(tarea['id'])
             
             if se_cumple:
                 print(f"¡Condición cumplida para Tarea #{tarea['id']}!")
-                # 4. Notificar
+                # Notificar
                 mensaje = f"¡Aviso del Agente!\nOrden: '{orden}'\nDato actual: {resultado}"
                 canal = tarea['canal'].lower()
                 
@@ -102,7 +123,7 @@ class BucleEjecucion:
                 elif 'telegram' in canal:
                     self.notificador.notificar_telegram(mensaje)
 
-                # 5. Cambiar estado
+                # Cambiar estado si no es recurrente
                 if not tarea['recurrencia']:
                     self.gestor.actualizar_estado(tarea['id'], 'finalizada')
                     print(f"Tarea #{tarea['id']} marcada como finalizada.")
@@ -121,8 +142,6 @@ class BucleEjecucion:
         print("Bucle principal iniciado en segundo plano (cada 1 minuto).")
 
     def _run_loop(self):
-        # Ejecutar inmediatamente la primera vez (opcional, pero útil para testing)
-        # self.procesar_tareas() 
         while self.corriendo:
             schedule.run_pending()
             time.sleep(1)

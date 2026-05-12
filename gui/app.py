@@ -1,15 +1,18 @@
 import customtkinter as ctk
 import threading
+import json
 from tkinter import messagebox
 from core.gestor_tareas import GestorTareas
 from core.voz import escuchar_y_transcribir
+from core.agente_llm import AgenteLLM
 
 class NotificationAgentGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
         
-        # Inicializar base de datos
+        # Inicializar base de datos y agente
         self.gestor = GestorTareas()
+        self.agente = AgenteLLM()
 
         # Configuración básica de la ventana
         self.title("Panel de Control Agéntico")
@@ -141,29 +144,38 @@ class NotificationAgentGUI(ctk.CTk):
         controls_frame.grid(row=2, column=0, sticky="nsew", padx=20, pady=(0, 20))
         
         controls_frame.grid_columnconfigure(0, weight=0)
-        controls_frame.grid_columnconfigure(1, weight=1)
-        controls_frame.grid_columnconfigure(2, weight=0)
+        controls_frame.grid_columnconfigure(1, weight=0)
+        controls_frame.grid_columnconfigure(2, weight=1)
+        controls_frame.grid_columnconfigure(3, weight=0)
         controls_frame.grid_rowconfigure(0, weight=1)
 
         self.combo_canal = ctk.CTkComboBox(
             controls_frame, 
             values=["Telegram", "Email", "Escritorio"],
-            width=140,
+            width=110,
             height=40
         )
-        self.combo_canal.grid(row=0, column=0, padx=(0, 15), sticky="w")
+        self.combo_canal.grid(row=0, column=0, padx=(0, 10), sticky="w")
         self.combo_canal.set("Telegram")
+
+        self.entry_freq = ctk.CTkEntry(
+            controls_frame,
+            placeholder_text="Frecuencia min",
+            width=110,
+            height=40
+        )
+        self.entry_freq.grid(row=0, column=1, padx=(0, 10), sticky="w")
 
         self.entry_orden = ctk.CTkEntry(
             controls_frame, 
             placeholder_text="Escribe tu orden aquí...",
             height=40
         )
-        self.entry_orden.grid(row=0, column=1, padx=5, sticky="ew")
+        self.entry_orden.grid(row=0, column=2, padx=5, sticky="ew")
         self.entry_orden.bind("<Return>", lambda event: self.enviar_orden()) # Permitir pulsar Enter
 
         buttons_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        buttons_frame.grid(row=0, column=2, padx=(15, 0), sticky="e")
+        buttons_frame.grid(row=0, column=3, padx=(15, 0), sticky="e")
         
         self.btn_mic = ctk.CTkButton(
             buttons_frame, 
@@ -226,19 +238,37 @@ class NotificationAgentGUI(ctk.CTk):
     def enviar_orden(self):
         orden = self.entry_orden.get().strip()
         canal = self.combo_canal.get()
+        frec_texto = self.entry_freq.get().strip()
         
         if orden:
-            # Guardamos la orden
-            self.gestor.agregar_tarea(orden, canal, recurrencia=False)
-            
-            # Limpiamos el input
             self.entry_orden.delete(0, 'end')
+            self.entry_orden.configure(placeholder_text="Procesando con la IA...")
             
-            # Recargamos la interfaz
-            self.cargar_tareas()
+            frecuencia_usuario = None
+            if frec_texto.isdigit():
+                frecuencia_usuario = int(frec_texto)
+                
+            threading.Thread(target=self._hilo_procesar_orden, args=(orden, canal, frecuencia_usuario), daemon=True).start()
+
+    def _hilo_procesar_orden(self, orden, canal, frecuencia_usuario):
+        intencion = self.agente.extraer_intencion(orden)
+        
+        if intencion:
+            if frecuencia_usuario is not None:
+                intencion['frecuencia_minutos'] = frecuencia_usuario
+            frec_final = intencion.get('frecuencia_minutos', 1)
             
-            # Cambiamos a la pestaña de Activas
-            self.tabview.set("Activas")
+            # Guardamos la orden
+            self.gestor.agregar_tarea(orden, canal, json.dumps(intencion), frec_final, recurrencia=False)
+            
+        # Volvemos al hilo principal para actualizar GUI
+        self.after(0, self._on_orden_procesada)
+
+    def _on_orden_procesada(self):
+        self.entry_orden.configure(placeholder_text="Escribe tu orden aquí...")
+        self.entry_freq.delete(0, 'end')
+        self.cargar_tareas()
+        self.tabview.set("Activas")
 
 def run_app():
     app = NotificationAgentGUI()
