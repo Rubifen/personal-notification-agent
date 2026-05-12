@@ -76,7 +76,8 @@ class BucleEjecucion:
                 if url and selector:
                     resultado = obtener_dato_web(url, selector)
             else:
-                resultado = "Condición de tiempo u otro tipo de tarea general."
+                ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                resultado = f"Información de sistema: La fecha y hora actual del equipo es {ahora}."
 
             if resultado is None:
                 continue
